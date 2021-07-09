@@ -6,7 +6,7 @@ set_property PACKAGE_PIN A18 [get_ports Tx_Serial]
 	set_property IOSTANDARD LVCMOS33 [get_ports Tx_Serial]
 set_property PACKAGE_PIN B18 [get_ports Rx_Serial]						
 	set_property IOSTANDARD LVCMOS33 [get_ports Rx_Serial]
-	
+
 set_property PACKAGE_PIN W7 [get_ports C[1]]					
 	set_property IOSTANDARD LVCMOS33 [get_ports C[1]]
 set_property PACKAGE_PIN W6 [get_ports C[2]]					
@@ -67,3 +67,5 @@ set_property PACKAGE_PIN V14 [get_ports Parallel_Out[7]]
 	
 set_property PACKAGE_PIN R2 [get_ports Enable]					
 	set_property IOSTANDARD LVCMOS33 [get_ports Enable]
+set_property PACKAGE_PIN T1 [get_ports Mode]					
+	set_property IOSTANDARD LVCMOS33 [get_ports Mode]

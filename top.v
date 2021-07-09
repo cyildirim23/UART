@@ -44,117 +44,14 @@ module Debounce(
 endmodule
 
 module UART(
-    input clk,
-    input Rx_Serial,
-    output reg [7:0] Rx_Data
+    input clk,              //clock signal
+    input Mode,             //Controls whether UART is in Rx or Tx mode
+    input Enable,           //Enable, controls when data is sent in Tx mode
+    input Rx_Serial,         // Serial in, for Rx
+    input [7:0] Tx_Parallel, //Parallel in, for Tx
     
-    );
-    parameter clks_per_bit = 868;
-    parameter IDLE = 3'b000;
-    parameter START = 3'b001;
-    parameter DATA = 3'b010;
-    parameter STOP = 3'b011;
-    parameter CLEAN = 3'b100;
-    
-    reg [9:0] clk_count = 0;
-    reg [2:0] bitIndex = 0;
-    reg [7:0] r_Rx_Data = 0;
-    reg r_DV = 0;
-    reg [2:0] SM = 0;
-    
-    always@(posedge clk)
-    begin
-        case(SM)
-        IDLE:
-        begin
-            clk_count <= 0;
-            bitIndex <= 0;
-            r_DV <= 0;
-            
-            if (Rx_Serial == 1'b0)
-                SM <= START;
-            else
-                SM <= IDLE;
-        end
-        START:
-        begin
-            if (clk_count == clks_per_bit / 2)
-            begin
-                if (Rx_Serial == 1'b0)
-                begin
-                    SM <= DATA;
-                    clk_count <= 0;
-                end
-                else
-                    SM <= IDLE;
-            end
-            else
-            begin
-                clk_count <= clk_count + 1;
-                SM <= START;
-            end
-        end
-        DATA:
-        begin
-            if (clk_count < clks_per_bit)
-            begin
-                clk_count <= clk_count + 1;
-                SM <= DATA;
-            end
-            else
-            begin
-                r_Rx_Data[bitIndex] <= Rx_Serial;
-                clk_count <= 0;
-                if (bitIndex < 7)
-                begin
-                    bitIndex = bitIndex + 1;
-                    SM <= DATA;
-                end
-                else
-                begin
-                    bitIndex = 0;
-                    SM <= STOP;
-                end
-            end
-        end
-        STOP:
-        begin
-            if (clk_count < clks_per_bit)
-            begin
-                clk_count <= clk_count + 1;
-                SM <= STOP;
-            end
-            else
-                begin
-                    clk_count <= 0;
-                    r_DV = 1;
-                    SM <= CLEAN;
-                end
-        end
-        CLEAN:
-        begin
-           r_DV = 0;
-           SM <= IDLE;
-        end
-       
-       default : SM <= IDLE;
-       
-       endcase
-    end
-    
-    always@(r_DV)
-    begin
-        if (r_DV == 1)
-            Rx_Data = r_Rx_Data;
-    end
-    
-endmodule
-
-module UART_Tx(            
-    input clk,
-    input Enable,           //Enable, mapped to a switch
-    input [7:0] Tx_Parallel, //Each bit mapped to a switch (8)
-    output reg Tx_Serial);   //Mapped to UART Tx
+    output reg [7:0] Rx_Data, //Parallel Out, for Rx
+    output reg Tx_Serial);   //Serial Out, for Tx
     
     parameter clks_per_bit = 868; //corresponding to FPGA clock speed divided by configured baud rate (115200)
     parameter IDLE = 3'b000;
@@ -163,14 +60,100 @@ module UART_Tx(
     parameter STOP = 3'b011;
     parameter CLEAN = 3'b100;
     
-    reg [9:0] clk_count = 0;        //used to count clock cycles, to output bits for the proper # of clock cycles
-    reg [2:0] bitIndex = 0;         //Bit index, used when serializing data
-    reg [2:0] SM = 0;               //Represents current state
-    reg [7:0] r_Tx_Parallel = 0;    //Internal register. Holds parallel data when Enable is active
+    reg [9:0] clk_count = 0; //used to count clock cycles, to output bits for the proper # of clock cycles,
+                            //or to sample serial input at the correct time (at peak stability)
+    reg [2:0] bitIndex = 0; //Used to keep track of which index of parallel data is being transmitted or received
+    reg [7:0] r_Rx_Data = 0;
+    reg r_DV = 0;           //Data valid boolean. Final step for receiver. When 1, the parallelized data is loaded
+    reg [2:0] SM = 0;       //Keeps track of which state the UART is in when receiving or transmitting
+    reg [7:0] r_Tx_Parallel = 0;    //Internal register for Tx. Holds parallel data when Enable is active
     
     always@(posedge clk)
     begin
-        case(SM)
+        case(Mode)
+        0:
+        begin
+            case(SM)
+            IDLE:
+            begin
+                clk_count <= 0;
+                bitIndex <= 0;
+                r_DV <= 0;
+                
+                if (Rx_Serial == 1'b0)
+                    SM <= START;
+                else
+                    SM <= IDLE;
+            end
+            START:
+            begin
+                if (clk_count == clks_per_bit / 2)
+                begin
+                    if (Rx_Serial == 1'b0)
+                    begin
+                        SM <= DATA;
+                        clk_count <= 0;
+                    end
+                    else
+                        SM <= IDLE;
+                end
+                else
+                begin
+                    clk_count <= clk_count + 1;
+                    SM <= START;
+                end
+            end
+            DATA:
+            begin
+                if (clk_count < clks_per_bit)
+                begin
+                    clk_count <= clk_count + 1;
+                    SM <= DATA;
+                end
+                else
+                begin
+                    r_Rx_Data[bitIndex] <= Rx_Serial;
+                    clk_count <= 0;
+                    if (bitIndex < 7)
+                    begin
+                        bitIndex = bitIndex + 1;
+                        SM <= DATA;
+                    end
+                    else
+                    begin
+                        bitIndex = 0;
+                        SM <= STOP;
+                    end
+                end
+            end
+            STOP:
+            begin
+                if (clk_count < clks_per_bit)
+                begin
+                    clk_count <= clk_count + 1;
+                    SM <= STOP;
+                end
+                else
+                    begin
+                        clk_count <= 0;
+                        r_DV = 1;
+                        SM <= CLEAN;
+                    end
+            end
+            CLEAN:
+            begin
+               r_DV = 0;
+               SM <= IDLE;
+            end
+           
+           default : SM <= IDLE;
+           
+           endcase
+        end
+    
+        1:
+        begin
+            case(SM)
             0:      //Waits for enable signal
             begin
             Tx_Serial <= 1;
@@ -247,9 +230,19 @@ module UART_Tx(
                 end
             end
             default: SM <= IDLE;
+            endcase
+        end
         endcase
     end
-endmodule    
+        
+        
+    always@(r_DV)
+    begin
+        if (r_DV == 1)
+            Rx_Data = r_Rx_Data;
+    end
+  
+endmodule      
 
 module Slow_Clock(
     input clk,
@@ -357,24 +350,19 @@ module Sw_Debug(
     always@(posedge clk)
         LED <= switch;
 endmodule
-    
-      
-            
              
-module top(clk, Enable, Tx_Parallel, AN, C, Tx_Serial, Parallel_Out);
-    input clk, Enable;
+module top(clk, Enable, Mode, Rx_Serial, Tx_Parallel, AN, C, Tx_Serial, Parallel_Out);
+    input clk, Enable, Mode, Rx_Serial;
     input wire [7:0] Tx_Parallel;
+    wire [7:0] Rx_Data;
     output [3:0] AN;
     output [7:1] C;
     output Tx_Serial;
     output [7:0] Parallel_Out;
-    UART inst_1(clk, switch_out, Tx_Parallel, Tx_Serial);
-    //UART_Rx inst_2(clk, Rx_Serial, Data);
-    Display inst_3(Tx_Parallel, clk_out, C, AN);
+    Debounce inst_1(Enable, clk, switch_out);
+    UART inst_2(clk, Mode, switch_out, Rx_Serial, Tx_Parallel, Rx_Data, Tx_Serial);
+    Display inst_3(Rx_Data, clk_out, C, AN);
     Slow_Clock inst_4(clk, clk_out);
     Sw_Debug inst_5(Tx_Parallel, clk, Parallel_Out);
-    Debounce inst_6(Enable, clk, switch_out);
-    
-    
-   
+     
 endmodule
