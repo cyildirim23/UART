@@ -244,9 +244,9 @@ module UART(
   
 endmodule      
 
-module Slow_Clock(
+module Display_Selector(
     input clk,
-    output reg clk_out);
+    output reg [1:0] Array);
     
     reg [19:0] counter = 0;   
     
@@ -256,7 +256,7 @@ module Slow_Clock(
         if (counter == 200_000)
         begin
             counter <= 0;
-            clk_out <= ~clk_out;
+            Array <= Array + 1;
         end
     end
 endmodule
@@ -264,7 +264,8 @@ endmodule
 
 module Display(
     input wire [7:0] Data,
-    input wire clk_out,
+    input wire [1:0] Array,
+    input wire Mode,
     output reg [7:1] C,
     output reg [3:0] AN
     );
@@ -295,49 +296,64 @@ module Display(
     parameter d = 7'b0100001;
     parameter E = 7'b0000110;
     parameter F = 7'b0001110;
+    parameter S = 7'b0010010;
+    parameter r = 7'b1001110;
     
     //One AN is on, and it displays the Hex digit of the upper half
     //Another AN is on, and it displays the Hex digit of the lower half
     //They toggle on and off fast
     
-    always@(clk_out)
+    always@(Array)
     begin
-        if (clk_out == 0)
-        begin
-            AN = 4'b0111;
-            case(dataUpper)
-                4'b0000:    C = zero;
-                4'b0001:    C = one;
-                4'b0010:    C = two;
-                4'b0011:    C = three;
-                4'b0100:    C = four;
-                4'b0101:    C = five;
-                4'b0110:    C = six;
-                4'b0111:    C = seven;
-            endcase
-        end  
-        else
-        begin 
-            AN = 4'b1011;
-            case(dataLower)
-                4'b0000:    C = zero;
-                4'b0001:    C = one;
-                4'b0010:    C = two;
-                4'b0011:    C = three;
-                4'b0100:    C = four;
-                4'b0101:    C = five;
-                4'b0110:    C = six;
-                4'b0111:    C = seven;
-                4'b1000:    C = eight;
-                4'b1001:    C = nine;
-                4'b1010:    C = A;  
-                4'b1011:    C = b;
-                4'b1100:    C = c;
-                4'b1101:    C = d;
-                4'b1110:    C = E;
-                4'b1111:    C = F;
-            endcase
-        end
+        case(Array)
+            0:
+            begin
+                AN = 4'b0111;
+                case(dataUpper)
+                    4'b0000:    C = zero;
+                    4'b0001:    C = one;
+                    4'b0010:    C = two;
+                    4'b0011:    C = three;
+                    4'b0100:    C = four;
+                    4'b0101:    C = five;
+                    4'b0110:    C = six;
+                    4'b0111:    C = seven;
+                endcase
+            end  
+            1:
+            begin 
+                AN = 4'b1011;
+                case(dataLower)
+                    4'b0000:    C = zero;
+                    4'b0001:    C = one;
+                    4'b0010:    C = two;
+                    4'b0011:    C = three;
+                    4'b0100:    C = four;
+                    4'b0101:    C = five;
+                    4'b0110:    C = six;
+                    4'b0111:    C = seven;
+                    4'b1000:    C = eight;
+                    4'b1001:    C = nine;
+                    4'b1010:    C = A;  
+                    4'b1011:    C = b;
+                    4'b1100:    C = c;
+                    4'b1101:    C = d;
+                    4'b1110:    C = E;
+                    4'b1111:    C = F;
+                endcase
+            end
+            2:
+            begin
+                AN = 4'b1110;
+                case(Mode)
+                    0:  C = r;
+                    1:  C = S;
+                endcase
+            end
+            
+            default: AN = 4'b1111;
+        endcase
+                    
     end
 
 endmodule
@@ -355,14 +371,15 @@ module top(clk, Enable, Mode, Rx_Serial, Tx_Parallel, AN, C, Tx_Serial, Parallel
     input clk, Enable, Mode, Rx_Serial;
     input wire [7:0] Tx_Parallel;
     wire [7:0] Rx_Data;
+    wire [1:0] Array;
     output [3:0] AN;
     output [7:1] C;
     output Tx_Serial;
     output [7:0] Parallel_Out;
     Debounce inst_1(Enable, clk, switch_out);
     UART inst_2(clk, Mode, switch_out, Rx_Serial, Tx_Parallel, Rx_Data, Tx_Serial);
-    Display inst_3(Rx_Data, clk_out, C, AN);
-    Slow_Clock inst_4(clk, clk_out);
+    Display inst_3(Rx_Data, Array, Mode, C, AN);
+    Display_Selector inst_4(clk, Array);
     Sw_Debug inst_5(Tx_Parallel, clk, Parallel_Out);
      
 endmodule
