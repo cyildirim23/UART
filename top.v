@@ -25,25 +25,37 @@
 module Debounce(                    //Module for debouncing a switch input
     input switch_in,
     input clk,
-    output reg switch_out);         //Debounced output
+    output reg switch_out,
+    output reg [19:0] counter = 0);         //Debounced output
     
-    parameter clks_per_switch = 25_000_000;
-    reg [25:0] clk_count = 0;
-    reg i_switch_in = 0;
+    parameter debounce_limit = 1_000_000;
     
-    //if switch pressed, send value of switch after a quarter of a second
-
+    
     always@(posedge clk)
     begin
-        i_switch_in <= switch_in;
-        if (clk_count == clks_per_switch)
-        begin
-            clk_count <= 0;
-            switch_out <= i_switch_in;
-        end
-        else
-            clk_count <= clk_count + 1;
-    end
+       if (switch_in == 1)
+           counter <= counter + 1;
+       if (counter == debounce_limit)
+       begin
+           switch_out <= 1;
+           counter <= 0;
+       end
+       else if (switch_in == 0)
+       begin
+           switch_out <= 0;
+           counter <= 0;
+       end
+   end
+endmodule
+ 
+module Debounce_Pulse(
+    input switch_in,
+    input clk,
+    output pulse_out);
+    
+    Debounce switch_debounce(switch_in, clk, switch);
+    Pulse switch_pulse(switch, clk, pulse_out);
+    
 endmodule
 
 module UART_Rx(                     //UART Receiver
@@ -613,7 +625,7 @@ module top(clk, Enable, Mode, Rx_Serial, Load, Parallel_In, AN, C, Tx_Serial, Pa
     output WR_LED;
     output EMPTY;
     output FULL;
-    Debounce inst_1(Enable, clk, switch_out);
+    Debounce_Pulse Enable_Pulse(Enable, clk, switch_out);
     UART_Rx inst_2(clk, Rx_Serial, Mode, Rx_Data, r_DV);
     UART_Tx inst_7(clk, switch_out, Mode, dataOut, Tx_Serial, read_enable);
     Display inst_3(r_Display_Data, dataOut, Array, Mode, C, AN);
