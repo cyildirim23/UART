@@ -36,8 +36,8 @@ module top(
     wire [1:0] Array;                                                                                       //Wires used to connect ports between modules
     wire [7:0] Rx_Data_Wires;
     
-    UART_Rx Receiver(.clk(clk), .Rx_Serial(Rx), .Rx_Data(Rx_Data_Wires), .r_DV(Data_Ready));                //UART receiver module instantiation
-    UART_Tx Transmitter(.clk(clk), .Tx_Serial(Tx), .Tx_Parallel(User_Tx), .Enable(Enable));                 //UART transmitter module instantiation
+    Variable_BR_Wrapper UART(.clk(clk), .Rx(Rx), .Enable(Enable), .Tx(Tx), .Rx_Data(Rx_Data_Wires), .Tx_Data(User_Tx), .BR_Select(BR_Select));
+    
     Debounce_Pulse Enable_Pulse(.clk(clk), .switch_in(Enable_Switch), .pulse_out(Enable));                  //Module used to debounce an input signal, and produce a single pulse as an output
     Display_Selector Array_Select(.clk(clk), .Array(Array));                                                //7seg array selector module instantiation
     Display(.Rx_Data(Rx_Data_Wires), .Tx_Data(User_Tx), .Array(Array), .Mode(Mode), .C(C), .AN(AN));        //7seg display module instantiation

@@ -1,22 +1,26 @@
+`timescale 1ns / 1ps
+
 module UART_Rx(                                     //UART Receiver
     input clk,
-    input Rx_Serial,                                //Serial input                
+    input Rx_Serial,                                //Serial input           
+    input [14:0] BR_Clocks,     
     output reg [7:0] Rx_Data,                       //Parallel data output
-    output reg r_DV = 0                             //Data valid ("receive complete" marker)
+    output reg r_DV = 0,                             //Data valid ("receive complete" marker)
+    output reg Rx_Ready,
+    output reg [14:0] Rx_r_BR_Clocks
     );
     
-    parameter clks_per_bit = 868;                   //# of clocks per bit for a baud rate of 115200 on 
-                                                    //xc7a35t basys 3 FPGA (100 MHz clock)
     parameter IDLE = 3'b000;                        //Different states
     parameter START = 3'b001;
     parameter DATA = 3'b010;
     parameter STOP = 3'b011;
     parameter CLEAN = 3'b100;
     
-    reg [9:0] clk_count = 0;
+    reg [14:0] clk_count = 0;
     reg [2:0] bitIndex = 0;                         //Data is sent one byte at a time, calling for 8 indices (one index per bit)
     reg [7:0] r_Rx_Data = 0;                        //Stores parallel data, shifted into parallel output if valid
     reg [2:0] SM = 0;                               //Holds the current state
+    //reg [14:0] Rx_r_BR_Clocks      = 0;
     
     always@(posedge clk)
     begin
@@ -25,9 +29,11 @@ module UART_Rx(                                     //UART Receiver
         case(SM)
         IDLE:
         begin
+            Rx_Ready <= 1;
             clk_count <= 0;
             bitIndex <= 0;
             r_DV <= 0;
+            Rx_r_BR_Clocks <= BR_Clocks;
             if (Rx_Serial == 0)                     //If a start bit is sent, and the device is in receive mode
                 SM <= START;                        //Go to "START" state
             else
@@ -35,7 +41,8 @@ module UART_Rx(                                     //UART Receiver
         end
         START:                                      //Verifies that a start bit is being received
         begin
-            if (clk_count == clks_per_bit / 2)      //Samples where the middle of the start bit would be
+            Rx_Ready <= 0;
+            if (clk_count == Rx_r_BR_Clocks / 2)      //Samples where the middle of the start bit would be
             begin                                   
                 if (Rx_Serial == 0)                 //If the value is still 0, it is in fact a start bit
                 begin                               //So, change states to "DATA", reset clock counter   
@@ -53,7 +60,7 @@ module UART_Rx(                                     //UART Receiver
         end
         DATA:                                       //This state stores each bit in an internal reg
         begin                                       //Each full clks_per_bit cycle from here will end mid-bit
-            if (clk_count < clks_per_bit)
+            if (clk_count < Rx_r_BR_Clocks)
             begin                                   //Make clk_count == clks_per_bit
                 clk_count <= clk_count + 1;     
                 SM <= DATA;
@@ -76,7 +83,7 @@ module UART_Rx(                                     //UART Receiver
         end
         STOP:                                       //Same idea as "START"; sample where the middle of the next bit would be
         begin
-            if (clk_count < clks_per_bit)
+            if (clk_count < Rx_r_BR_Clocks)
             begin
                 clk_count <= clk_count + 1;
                 SM <= STOP;

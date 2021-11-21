@@ -10,11 +10,13 @@ module UART_Tx(
     input clk,
     input Enable,                                       //Enable, when == 1, sends the current parallel input as a serial output       
     input [7:0] Tx_Parallel,                            //Parallel input, to be sent serially
+    input [14:0] BR_Clocks,
     output reg Tx_Serial,                               //Serial output                             
-    output reg Tx_Complete                              //Pulse, increments a counter in wrapper once a byte is successfully transmitted
+    output reg Tx_Complete = 0,                              //Pulse, increments a counter in wrapper once a byte is successfully transmitted
+    output reg Tx_Ready = 0,
+    output reg [14:0] Tx_r_BR_Clocks,
+    output reg [14:0] clk_count         = 0
     ); 
-                              
-    parameter clks_per_bit = 868; 
                                                         //Different states
     parameter IDLE              = 3'b000;
     parameter LOAD              = 3'b001;
@@ -22,18 +24,21 @@ module UART_Tx(
     parameter DATA              = 3'b011;
     parameter STOP              = 3'b100;
     
-    reg [9:0] clk_count         = 0;                    //used to count clock cycles, to output bits for the proper # of clock cycles
+    //reg [9:0] clk_count         = 0;                    //used to count clock cycles, to output bits for the proper # of clock cycles
     reg [2:0] bitIndex          = 0;                    //Bit index, used when serializing data
-    reg [2:0] SM                = 0;                    //Represents current state
+    reg [2:0] SM                = IDLE;                    //Represents current state
     reg [7:0] r_Tx_Parallel     = 0;                    //Internal register. Holds parallel data when Enable is active
+    //reg [14:0] Tx_r_BR_Clocks      = 0;
     
     always@(posedge clk)
     begin
         case(SM)
-            0:                                          //Waits for enable signal
+            IDLE:                                          //Waits for enable signal
             begin
-            Tx_Complete <= 0;
-            Tx_Serial <= 1;                             //Serial output is driven high when not transmitting
+                Tx_Ready <= 1;
+                Tx_Complete <= 0;
+                Tx_Serial <= 1;                             //Serial output is driven high when not transmitting
+                Tx_r_BR_Clocks <= BR_Clocks;
                 if(Enable)
                 begin                                   //Begin transmission
                     SM <= LOAD;
@@ -41,15 +46,16 @@ module UART_Tx(
                 else
                     SM <= IDLE;                         //If Enable is 1, and device is in transmission mode, 
             end
-            1:                                          //LOAD, loads input
+            LOAD:                                          //LOAD, loads input
             begin
+                Tx_Ready <= 0;
                 r_Tx_Parallel <= Tx_Parallel;           //Parallel input is loaded to internal reg
                 SM <= START;                            //Proceed to "START" state
             end
-            2:                                          //START, sends a start bit
+            START:                                          //START, sends a start bit
             begin       
                 Tx_Serial <= 0;                         //Serial out is driven low for for 868 clocks (115200 baud) for the start bit
-                if (clk_count < clks_per_bit - 1)
+                if (clk_count < Tx_r_BR_Clocks - 1)
                 begin
                     clk_count <= clk_count + 1;
                     SM <= START;
@@ -60,10 +66,10 @@ module UART_Tx(
                     clk_count <= 0;
                 end
             end
-            3:                                          //DATA, sends each bit of data
+            DATA:                                          //DATA, sends each bit of data
             begin
                 Tx_Serial <= r_Tx_Parallel[bitIndex];
-                if (clk_count < clks_per_bit - 1)       //for 868 clocks, drive the output with the current
+                if (clk_count < Tx_r_BR_Clocks - 1)       //for 868 clocks, drive the output with the current
                 begin                                   //index of the internal reg
                     SM <= DATA;
                     clk_count <= clk_count + 1;
@@ -85,10 +91,10 @@ module UART_Tx(
                 end
             end  
            
-            4:                                          //STOP, sends a stop bit
+            STOP:                                          //STOP, sends a stop bit
             begin
                 Tx_Serial <= 1;                         //Drive Tx output high for 868 clock cycles
-                if (clk_count < clks_per_bit - 1)
+                if (clk_count < Tx_r_BR_Clocks - 1)
                 begin
                     clk_count <= clk_count + 1;
                     SM <= STOP;
