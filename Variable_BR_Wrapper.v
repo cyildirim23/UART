@@ -1,45 +1,29 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 11/20/2021 11:23:47 AM
-// Design Name: 
-// Module Name: Variable_BR_Wrapper
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
+
+/*
+    This module holds control logic for the UART receiver and transmitter, namely the logic
+    that controls the baud rate for both modules
+*/
 
 
 module Variable_BR_Wrapper(
 
-    input clk, Rx, Enable, 
-    input [2:0] BR_Select,
-    input [7:0] Tx_Data,
-    output Tx,
-    output [7:0] Rx_Data,
-    output reg [14:0] BR_Clocks,
-    output wire [14:0] Tx_r_BR_Clocks,
-    output wire [14:0] Rx_r_BR_Clocks,
-    output wire [14:0] clk_count
+    input clk, 
+    input Rx,                                                                   //UART Rx input
+    input Enable,                                                               //Enable for Tx
+    input [2:0] BR_Select,                                                      //Baud rate select
+    input [7:0] Tx_Data,                                                        //Data to transmit
+    output Tx,                                                                  //UART Tx for output
+    output [7:0] Rx_Data                                                        //Data received
     );
     
-    wire Tx_Ready;
-    wire Rx_Ready;
-    //reg [14:0] BR_Clocks;
+    wire Tx_Ready;                                                              //Wire from Tx module, indicating no active transmission if high
+    wire Rx_Ready;                                                              //Wire from Rx module, indicating no active transmission if high
+    reg [14:0] BR_Clocks;                                                       //Number of clock cycles for 1 bit to be sent or recieved, depending on baud rate and FPGA clock (100MHz)
     
     always@(posedge clk)
     begin
-        if (Tx_Ready && Rx_Ready)
+        if (Tx_Ready && Rx_Ready)                                               //If no transmissions are active, set desired baud rate
         begin
             case(BR_Select)
                 0:  BR_Clocks <= 15'd20834;                                   //Selected baud is 4800
@@ -55,7 +39,7 @@ module Variable_BR_Wrapper(
     end
     
     
-    UART_Rx Receiver(.clk(clk), .BR_Clocks(BR_Clocks), .Rx_Serial(Rx), .Rx_Data(Rx_Data), .r_DV(Data_Ready), .Rx_Ready(Rx_Ready), .Rx_r_BR_Clocks(Rx_r_BR_Clocks));                //UART receiver module instantiation
-    UART_Tx Transmitter(.clk(clk), .BR_Clocks(BR_Clocks), .Tx_Serial(Tx), .Tx_Parallel(Tx_Data), .Enable(Enable), .Tx_Ready(Tx_Ready), .Tx_r_BR_Clocks(Tx_r_BR_Clocks), .clk_count(clk_count));                 //UART transmitter module instantiation
+    UART_Rx Receiver(.clk(clk), .BR_Clocks(BR_Clocks), .Rx_Serial(Rx), .Rx_Data(Rx_Data), .r_DV(Data_Ready), .Rx_Ready(Rx_Ready));                //UART receiver module instantiation
+    UART_Tx Transmitter(.clk(clk), .BR_Clocks(BR_Clocks), .Tx_Serial(Tx), .Tx_Parallel(Tx_Data), .Enable(Enable), .Tx_Ready(Tx_Ready));           //UART transmitter module instantiation
     
 endmodule
