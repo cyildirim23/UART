@@ -8,7 +8,7 @@ mode is selected. Simply, this module can be seen as a multiplexer.
 
 module UART_Display(
 
-    input wire [7:0] Rx_Data,           //Array which holds the most recently stored word  (Displayed in Rx mode)
+    input wire [7:0] Rx_Data,           //Array which holds the most recently stored word (Displayed in Rx mode)
     input wire [7:0] Tx_Data,           //Array which holds the next word to be sent (Displayed in Tx mode)
     input wire Mode,                    //Display mode
     input wire [1:0] Array,

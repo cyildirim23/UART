@@ -46,8 +46,8 @@ module UART_Rx_TB();
             #1736;
             if (Tx_Value != Rx_Data)                            //Compare serial output data to the parallel input
             begin
-                errorCount = errorCount + 1;                            //If mismatch, add 1 to errorCount, print value of input where mismatch occurred
-                $display("Mismatch at Tx_Value =  %d", Tx_Value);
+                errorCount = errorCount + 1;                            //If mismatch, add 1 to errorCount, print value of input 
+                $display("Mismatch at Tx_Value =  %d", Tx_Value);       //  where mismatch occurred
             end
             j = 0;                                                      //Reset accumulator
             Tx_Value = Tx_Value + 1;                                    //Increase Tx_Parallel by 1
